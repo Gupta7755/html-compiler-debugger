@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML Compiler & Debugger</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+    }
+
+    header {
+      background: #333;
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-size: 1.5rem;
+    }
+
+    .container {
+      display: flex;
+      height: calc(100vh - 60px);
+    }
+
+    .editor-pane,
+    .right-pane {
+      flex: 1;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .editor-pane {
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #editor {
+      display: none;
+    }
+
+    .right-pane {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .debug-console {
+      height: 30%;
+      background: #000;
+      color: #fff;
+      padding: 10px;
+      overflow-y: auto;
+      font-family: monospace;
+      border-bottom: 2px solid #ccc;
+    }
+
+    iframe {
+      flex: 1;
+      border: none;
+      background: white;
+    }
+
+    .controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .controls button {
+      padding: 8px 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+    }
+
+    .success {
+      color: #4caf50;
+    }
+
+    .error {
+      color: #f44336;
+    }
+  </style>
+</head>
+
+<body>
+  <header>🚀 Smart HTML Compiler & Live Debugger 🔍</header>
+  <div class="container">
+    <div class="editor-pane">
+      <textarea id="code" name="code"></textarea>
+      <div class="controls">
+        <button onclick="formatAndCompile()">Format & Compile</button>
+        <button onclick="clearEditor()">Clear</button>
+      </div>
+    </div>
+    <div class="right-pane">
+      <div class="debug-console" id="debug"></div>
+      <iframe id="preview"></iframe>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
+
+  <script>
+    const editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+      mode: "htmlmixed",
+      theme: "dracula",
+      lineNumbers: true,
+      lineWrapping: true
+    });
+
+    // Set fixed height after initialization
+    editor.setSize(null, "800px");
+
+    function formatAndCompile() {
+      const rawCode = editor.getValue();
+      const formatted = html_beautify(rawCode);
+      editor.setValue(formatted);
+
+      const errors = checkHTMLErrors(formatted);
+      const debug = document.getElementById("debug");
+      debug.innerHTML = "";
+
+      if (errors.length > 0) {
+        errors.forEach(err => debug.innerHTML += `<div class='error'>❌ ${err}</div>`);
+      } else {
+        debug.innerHTML = `<div class='success'>✅ Compilation Successful at ${new Date().toLocaleTimeString()}</div>`;
+        const preview = document.getElementById("preview");
+        preview.srcdoc = formatted;
+      }
+    }
+
+    function checkHTMLErrors(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const errors = [];
+
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        errors.push("HTML Parsing Error: " + parseError.textContent.trim());
+      }
+
+      const voidTags = new Set([
+        'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+        'link', 'meta', 'source', 'track', 'wbr'
+      ]);
+
+      const openTags = [];
+      const tagRegex = /<\/?([a-zA-Z0-9]+)[^>]*>/g;
+      let match;
+      while ((match = tagRegex.exec(html)) !== null) {
+        const tag = match[1].toLowerCase();
+        const isClosing = match[0].startsWith("</");
+
+        if (voidTags.has(tag)) continue;
+
+        if (!isClosing) {
+          openTags.push({ tag, index: match.index });
+        } else {
+          const last = openTags.pop();
+          if (!last || last.tag !== tag) {
+            const lineNumber = html.substring(0, match.index).split(" ").length;
+            errors.push(`❌ Tag mismatch: expected </${last ? last.tag : "unknown"}> but found </${tag}> at line ${lineNumber}`);
+          }
+        }
+      }
+
+      openTags.forEach(unclosed => {
+        const lineNumber = html.substring(0, unclosed.index).split(" ").length;
+        errors.push(`❌ Unclosed tag: <${unclosed.tag}> at line ${lineNumber}`);
+      });
+
+      return errors;
+    }
+
+    function clearEditor() {
+      editor.setValue("");
+      document.getElementById("debug").innerHTML = "";
+      document.getElementById("preview").srcdoc = "";
+    }
+  </script>
+</body>
+
+</html>
